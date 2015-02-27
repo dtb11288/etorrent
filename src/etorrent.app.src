@@ -1,0 +1,12 @@
+{application, etorrent,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { etorrent_app, []}},
+  {env, []}
+ ]}.
