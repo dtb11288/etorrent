@@ -16,7 +16,7 @@
 decode(Data) ->
     case catch dec(Data) of
         {'EXIT', _} ->
-            {error, unparsed};
+            {error, cannot_decode};
         {Result, _} ->
             {ok, Result}
     end.
@@ -58,7 +58,12 @@ decode_dictionary(Data, Result) ->
 
 % encode erlang term to bencoding binary
 encode(Data) ->
-    enc(Data).
+    case catch enc(Data) of
+        {'EXIT', _} ->
+            {error, cannot_encode};
+        Result ->
+            {ok, Result}
+    end.
 
 % local encode functions
 enc(Int) when is_integer(Int) ->
@@ -67,13 +72,40 @@ enc(Int) when is_integer(Int) ->
 enc(List) when is_list(List) ->
     EncodedList = lists:foldl(fun(Item, Acc) ->
         EncodedItem = enc(Item),
-        <<EncodedItem/binary, Acc/binary>>
+        <<Acc/binary, EncodedItem/binary>>
     end, <<>>, List),
-    <<$l, EncodedList, $e>>;
+    <<$l, EncodedList/binary, $e>>;
 enc(String) when is_binary(String) ->
     Length = integer_to_binary(byte_size(String)),
     <<Length/binary, $:, String/binary>>;
-%% enc(Map) when is_map(Map) ->
-%%     Map;
+enc(Map) when is_map(Map) ->
+    EncodedMap = maps:fold(fun(Key, Value, Acc) ->
+        EncodedKey = enc(Key),
+        EncodedValue = enc(Value),
+        <<Acc/binary, EncodedKey/binary, EncodedValue/binary>>
+    end, <<>>, Map),
+    <<$d, EncodedMap/binary, $e>>;
 enc(_) ->
     exit(unknown_type).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+decode_test() ->
+    ?assertEqual({ok, 123}, bencoding:decode(<<"i123e">>)),
+    ?assertEqual({ok, <<"abcde">>}, bencoding:decode(<<"5:abcde">>)),
+    ?assertEqual({ok, [123, <<"abcde">>]}, bencoding:decode(<<"li123e5:abcdee">>)),
+    ?assertEqual({ok, #{<<"key1">> => <<"value1">>, <<"key2">> => <<"value2">>}}, bencoding:decode(<<"d4:key16:value14:key26:value2e">>)),
+    ?assertEqual({error, cannot_decode}, bencoding:decode(what_the_hell)),
+    done.
+
+encode_test() ->
+    ?assertEqual({ok, <<"i123e">>}, bencoding:encode(123)),
+    ?assertEqual({ok, <<"5:abcde">>}, bencoding:encode(<<"abcde">>)),
+    ?assertEqual({ok, <<"li123e5:abcdee">>}, bencoding:encode([123, <<"abcde">>])),
+    ?assertEqual({ok, <<"d4:key16:value14:key26:value2e">>}, bencoding:encode(#{<<"key1">> => <<"value1">>, <<"key2">> => <<"value2">>})),
+    ?assertEqual({error, cannot_encode}, bencoding:encode(what_the_hell)),
+    done.
+
+-endif.
+
