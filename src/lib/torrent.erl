@@ -72,8 +72,7 @@ parse_peers(Data = <<$l, _>>, PeerList) ->
         {ID, Port}
     end, List);
 parse_peers(<<IpBinary:4/binary, PortBinary:2/binary, Rest/binary>>, PeerList) ->
-    [I1, I2, I3, I4] = binary_to_list(IpBinary),
-    Ip = {I1, I2, I3, I4},
+    Ip = string:join([integer_to_list(X) || X <- binary_to_list(IpBinary)], "."),
     [B1, B2] = binary_to_list(PortBinary),
     Port = B1 bsl 8 + B2,
     parse_peers(Rest, [{Ip, Port} | PeerList]);
