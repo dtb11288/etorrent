@@ -15,11 +15,15 @@
 download({Ip, Port}) ->
     % connect to the peer
     {ok, Sock} = gen_tcp:connect(Ip, Port,
-        [binary, {active, true}]),
+        [binary, {packet, 0}, {active, false}]),
 
     % handshake with the peer
-    Handshake = [19] ++ "BitTorrent protocol" ++ [0 || _<- lists:seq(1, 20)] ++ get(info_hash) ++ get(peer_id),
+    Handshake = [19, "BitTorrent protocol", [0 || _<- lists:seq(1, 8)], get(info_hash), get(peer_id)],
     ok = gen_tcp:send(Sock, Handshake),
+
+    % receive handshake
+    {ok, <<19, "BitTorrent protocol", _:8/binary, _:20/binary, PeerID:20/binary>>} = gen_tcp:recv(Sock, 68),
+    io:format("~s~n", [PeerID]),
 
     ok.
 
