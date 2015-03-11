@@ -18,11 +18,10 @@ download({Ip, Port}) ->
         [binary, {active, true}]),
 
     % handshake with the peer
-    Handshake = "",
+    Handshake = [19] ++ "BitTorrent protocol" ++ [0 || _<- lists:seq(1, 20)] ++ get(info_hash) ++ get(peer_id),
     ok = gen_tcp:send(Sock, Handshake),
 
     ok.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
