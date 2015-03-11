@@ -64,11 +64,13 @@ tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
 
     Body.
 
-parse_peers(Data = <<$l, _>>, PeerList) ->
+parse_peers(Data = <<$l, _>>, _) ->
     {ok, List} = bencoding:decode(Data),
     lists:map(fun(Map) ->
         ID = maps:get(<<"ip">>, Map),
-        Port = maps:get(<<"port">>, Map),
+        PortBinary = maps:get(<<"port">>, Map),
+        [B1, B2] = binary_to_list(PortBinary),
+        Port = B1 bsl 8 + B2,
         {ID, Port}
     end, List);
 parse_peers(<<IpBinary:4/binary, PortBinary:2/binary, Rest/binary>>, PeerList) ->
