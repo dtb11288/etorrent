@@ -8,6 +8,7 @@
 %%%-------------------------------------------------------------------
 -module(peer).
 -author("art").
+-define(M(Message), utils:message(Message)).
 
 %% API
 -export([download/1]).
@@ -24,6 +25,16 @@ download({Ip, Port}) ->
     % receive handshake
     {ok, <<19, "BitTorrent protocol", _:8/binary, _:20/binary, PeerID:20/binary>>} = gen_tcp:recv(Sock, 68),
     io:format("~s~n", [PeerID]),
+
+    % pieces
+
+    % after handshake, send choke to peer
+    inet:setopts(Sock, [{packet, 4}, {active, true}]),
+    gen_tcp:send(Sock, ?M(choke)),
+
+    receive
+        Any -> io:format("~p~n", [Any])
+    end,
 
     ok.
 
