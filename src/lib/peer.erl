@@ -26,7 +26,7 @@ download({Ip, Port}) ->
     {ok, <<19, "BitTorrent protocol", _:8/binary, _:20/binary, PeerID:20/binary>>} = gen_tcp:recv(Sock, 68),
     io:format("Client PeerID ~s~n", [PeerID]),
 
-    % after handshake, send choke to peer
+    % after handshake, communicate with peer
     inet:setopts(Sock, [{packet, 4}, {active, true}]),
 
     receive
@@ -36,7 +36,7 @@ download({Ip, Port}) ->
     end,
 
     %% send interest message
-%%     ok = gen_tcp:send(Sock, ?M(interested)),
+    ok = gen_tcp:send(Sock, ?M(interested)),
 %%     receive
 %%         {tcp, _, Answer} -> io:format("~w~n", [Answer]);
 %%         ANy -> io:format("~w~n", [ANy])
