@@ -20,13 +20,30 @@ download(TorrentFile) ->
     % send request to tracker
     PeerList = send_info(TorrentData),
 
+    % create pieces server
+    Pieces = get_pieces(),
+%%     io:format("~s~n", [Pieces]),
+%%     register(piece_list, spawn(loop(Pieces))),
+
     % after get the peerlist, each peer in the list, connect
     % TODO: choose which peer to connect
     % TODO: now using the first peer to test
-    io:format("~p~n", [hd(PeerList)]),
+%%     io:format("~p~n", [hd(PeerList)]),
     peer:download(hd(PeerList)),
 
     done.
+
+get_pieces() ->
+    PieceLength = maps:get(<<"piece length">>, get(info)),
+    io:format("~p~n", [PieceLength]),
+    SHAPieces = maps:get(<<"pieces">>, get(info)),
+    io:format("~p~n", [length(binary_to_list(SHAPieces))]),
+    SHAPieces.
+
+loop(_Pieces) ->
+    receive
+        Any -> io:format("~p~n", [Any]), loop(_Pieces)
+    end.
 
 send_info(TorrentData) ->
     % prepare params
@@ -38,13 +55,14 @@ send_info(TorrentData) ->
     InfoMap = maps:get(<<"info">>, TorrentData),
 
     {ok, Info} = bencoding:encode(maps:get(<<"info">>, TorrentData)),
-    SHAInfo = [io_lib:format("%~2.16.0b", [X]) || X <- binary_to_list(crypto:hash(sha, Info))],
-    put(info_hash, binary_to_list(crypto:hash(sha, Info))),
+    SHAInfo = binary_to_list(crypto:hash(sha, Info)),
+    SHAInfoEncoded = [io_lib:format("%~2.16.0b", [X]) || X <- SHAInfo],
+    put(info_hash, SHAInfo),
     put(peer_id, PeerID),
     put(info, InfoMap),
 
     % get tracker response
-    Body = tracker_connect(AnnounceUrl, SHAInfo, PeerID),
+    Body = tracker_connect(AnnounceUrl, SHAInfoEncoded, PeerID),
 
     % decode tracker response
     {ok, PeerInfos} = bencoding:decode(list_to_binary(Body)),

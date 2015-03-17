@@ -19,22 +19,30 @@ download({Ip, Port}) ->
         [binary, {packet, 0}, {active, false}]),
 
     % handshake with the peer
-    Handshake = [19, "BitTorrent protocol", [0 || _<- lists:seq(1, 8)], get(info_hash), get(peer_id)],
+    Handshake = list_to_binary([19, "BitTorrent protocol", [0 || _<- lists:seq(1, 8)], get(info_hash), get(peer_id)]),
     ok = gen_tcp:send(Sock, Handshake),
 
     % receive handshake
     {ok, <<19, "BitTorrent protocol", _:8/binary, _:20/binary, PeerID:20/binary>>} = gen_tcp:recv(Sock, 68),
-    io:format("~s~n", [PeerID]),
-
-    % pieces
+    io:format("Client PeerID ~s~n", [PeerID]),
 
     % after handshake, send choke to peer
     inet:setopts(Sock, [{packet, 4}, {active, true}]),
-    gen_tcp:send(Sock, ?M(choke)),
 
     receive
-        Any -> io:format("~p~n", [Any])
+        {tcp, _, BitField} -> io:format("~w~n", [BitField])
+    after 10000 ->
+        io:format("Timeout")
     end,
+
+    %% send interest message
+%%     ok = gen_tcp:send(Sock, ?M(interested)),
+%%     receive
+%%         {tcp, _, Answer} -> io:format("~w~n", [Answer]);
+%%         ANy -> io:format("~w~n", [ANy])
+%%     after 10000 ->
+%%         ok
+%%     end,
 
     ok.
 

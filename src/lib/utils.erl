@@ -13,12 +13,12 @@
 -export([message/1]).
 
 message(keep_alive) ->
-    <<0000>>;
+    <<>>;
 message(choke) ->
-    <<00010>>;
+    <<0>>;
 message(unchoke) ->
-    <<00011>>;
-message(have) ->
-    <<0000>>;
+    <<1>>;
+message(interested) ->
+    <<2>>;
 message(_) ->
     throw(unknow_message).
