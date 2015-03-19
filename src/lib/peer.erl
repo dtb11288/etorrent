@@ -27,7 +27,7 @@ download({Ip, Port}) ->
     io:format("Client PeerID ~s~n", [PeerID]),
 
     % after handshake, communicate with peer
-    inet:setopts(Sock, [{packet, 4}, {active, true}]),
+    inet:setopts(Sock, [{packet, 4}, {active, true}, {packet_size, 33000}]),
 
     receive
         {tcp, _, BitField} -> io:format("~w~n", [BitField])
@@ -37,12 +37,9 @@ download({Ip, Port}) ->
 
     %% send interest message
     ok = gen_tcp:send(Sock, ?M(interested)),
-%%     receive
-%%         {tcp, _, Answer} -> io:format("~w~n", [Answer]);
-%%         ANy -> io:format("~w~n", [ANy])
-%%     after 10000 ->
-%%         ok
-%%     end,
+    receive
+        {tcp, _, Answer} -> io:format("~w~n", [Answer])
+    end,
 
     ok.
 

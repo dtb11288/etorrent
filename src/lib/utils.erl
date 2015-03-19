@@ -30,7 +30,7 @@ integer_to_bits(Int) ->
 
 integer_to_bits(_, 8, R) -> R;
 integer_to_bits(Int, Cur, R) ->
-    integer_to_bits(Int bsr 1, Cur + 1, [Int rem 2 | R]).
+    integer_to_bits(Int bsr 1, Cur + 1, [Int band 1 | R]).
 
 
 -ifdef(TEST).

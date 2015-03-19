@@ -17,37 +17,7 @@ download(TorrentFile) ->
     {ok, Torrent} = file:read_file(TorrentFile),
     {ok, TorrentData} = bencoding:decode(Torrent),
 
-    % send request to tracker
-    PeerList = send_info(TorrentData),
-
-    % create pieces server
-    Pieces = get_pieces(),
-%%     io:format("~s~n", [Pieces]),
-%%     register(piece_list, spawn(loop(Pieces))),
-
-    % after get the peerlist, each peer in the list, connect
-    % TODO: choose which peer to connect
-    % TODO: now using the first peer to test
-%%     io:format("~p~n", [hd(PeerList)]),
-    peer:download(hd(PeerList)),
-
-    done.
-
-get_pieces() ->
-    PieceLength = maps:get(<<"piece length">>, get(info)),
-    io:format("~p~n", [PieceLength]),
-    SHAPieces = maps:get(<<"pieces">>, get(info)),
-    io:format("~p~n", [length(binary_to_list(SHAPieces))]),
-    SHAPieces.
-
-loop(_Pieces) ->
-    receive
-        Any -> io:format("~p~n", [Any]), loop(_Pieces)
-    end.
-
-send_info(TorrentData) ->
-    % prepare params
-    % announce url
+    % prepare information parameters
     AnnounceUrl = binary_to_list(maps:get(<<"announce">>, TorrentData)),
     PeerID = "-FT-1234567890123456",
 
@@ -61,12 +31,35 @@ send_info(TorrentData) ->
     put(peer_id, PeerID),
     put(info, InfoMap),
 
-    % get tracker response
-    Body = tracker_connect(AnnounceUrl, SHAInfoEncoded, PeerID),
+    % send request to tracker
+    PeerList = tracker_connect(AnnounceUrl, SHAInfoEncoded, PeerID),
 
-    % decode tracker response
-    {ok, PeerInfos} = bencoding:decode(list_to_binary(Body)),
-    parse_peers(maps:get(<<"peers">>, PeerInfos), []).
+    % create pieces server
+    Pieces = get_pieces(InfoMap),
+%%     io:format("~s~n", [Pieces]),
+%%     register(piece_list, spawn(loop(Pieces))),
+
+    % after get the peerlist, each peer in the list, connect
+    % TODO: choose which peer to connect
+    % TODO: now using the first peer to test
+%%     io:format("~p~n", [hd(PeerList)]),
+    peer:download(hd(PeerList)),
+
+    done.
+
+get_pieces(Info) ->
+    PieceLength = maps:get(<<"piece length">>, Info),
+%%     io:format("~p~n", [PieceLength]),
+    SHAPieces = maps:get(<<"pieces">>, Info),
+%%     io:format("~p~n", [SHAPieces]),
+    SHAPieces.
+
+loop([]) -> download_completed;
+loop(Pieces) ->
+    receive
+        {add, Piece} -> loop([Piece | Pieces]);
+        {remove, Piece} -> loop(Pieces -- [Piece])
+    end.
 
 tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
     Port = 6881,
@@ -85,7 +78,9 @@ tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
 
     % TODO: if failed, retry, or get error message -> handle it
 
-    Body.
+    % decode tracker response
+    {ok, PeerInfos} = bencoding:decode(list_to_binary(Body)),
+    parse_peers(maps:get(<<"peers">>, PeerInfos), []).
 
 parse_peers(Data = <<$l, _>>, _) ->
     {ok, List} = bencoding:decode(Data),
