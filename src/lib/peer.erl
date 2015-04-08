@@ -27,8 +27,9 @@ download({Ip, Port}) ->
     io:format("Client PeerID ~s~n", [PeerID]),
 
     % after handshake, communicate with peer
-    inet:setopts(Sock, [{packet, 4}, {active, true}, {packet_size, 33000}]),
+    inet:setopts(Sock, [{packet, 4}, {active, true}]),
 
+    % receive bitfield
     receive
         {tcp, _, BitField} -> io:format("~w~n", [BitField])
     after 10000 ->
@@ -39,6 +40,20 @@ download({Ip, Port}) ->
     ok = gen_tcp:send(Sock, ?M(interested)),
     receive
         {tcp, _, Answer} -> io:format("~w~n", [Answer])
+    after 1000 ->
+        % if you dont receive choked message (or any message), just keep continue request
+        io:format("Timeout")
+    end,
+
+    % send request to peer
+    ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<0:32>>,
+        <<0:32>>,
+        <<16384:32>>))),
+
+    receive
+        WHATEVER -> io:format("WHATEVER ~p~n", [WHATEVER])
+    after 30000 ->
+        io:format("Timeout")
     end,
 
     ok.

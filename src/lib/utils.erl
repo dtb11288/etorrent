@@ -10,7 +10,7 @@
 -author("art").
 
 %% API
--export([message/1, integer_to_bits/1]).
+-export([message/1, integer_to_bits/1, request/3]).
 
 message(keep_alive) ->
     <<>>;
@@ -24,6 +24,9 @@ message(not_interested) ->
     <<3>>;
 message(_) ->
     throw(unknow_message).
+
+request(Index, Offset, Length)->
+    <<6, Index/binary, Offset/binary, Length/binary>>.
 
 integer_to_bits(Int) ->
     integer_to_bits(Int, 0, []).

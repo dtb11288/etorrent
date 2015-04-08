@@ -10,7 +10,13 @@
 -author("art").
 
 %% API
--export([download/1]).
+-export([download/1, pieces_loop/1, download/0]).
+-include("torrent.hrl").
+
+download() ->
+    TorrentFile = "test.torrent",
+    torrent:download(TorrentFile),
+    done.
 
 download(TorrentFile) ->
     % read torrent file, decode it
@@ -36,8 +42,8 @@ download(TorrentFile) ->
 
     % create pieces server
     Pieces = get_pieces(InfoMap),
-%%     io:format("~s~n", [Pieces]),
-%%     register(piece_list, spawn(loop(Pieces))),
+    io:format("~p~n", [Pieces]),
+    register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
 
     % after get the peerlist, each peer in the list, connect
     % TODO: choose which peer to connect
@@ -48,17 +54,48 @@ download(TorrentFile) ->
     done.
 
 get_pieces(Info) ->
+    ChunkLength = 1 bsl 14,
     PieceLength = maps:get(<<"piece length">>, Info),
-%%     io:format("~p~n", [PieceLength]),
-    SHAPieces = maps:get(<<"pieces">>, Info),
-%%     io:format("~p~n", [SHAPieces]),
-    SHAPieces.
+    FileLength = maps:get(<<"length">>, Info),
+    put(piece_length, PieceLength),
+    io:format("PieceLength ~p~n", [PieceLength]),
+    io:format("FileLength ~p~n", [FileLength]),
 
-loop([]) -> download_completed;
-loop(Pieces) ->
+    % calculate how many pieces
+    LastPieceLength = FileLength rem PieceLength,
+    NoOfPieces = case LastPieceLength of
+                     0 -> FileLength div PieceLength;
+                     _ -> FileLength div PieceLength + 1
+                 end,
+
+
+    % calculate how many chunks in each piece
+    LastChunkLength = PieceLength rem ChunkLength,
+    NoOfChunks = case LastChunkLength of
+                     0 -> PieceLength div ChunkLength;
+                     _ -> PieceLength div ChunkLength + 1
+                 end,
+
+
+    % calculate how many chunks in last piece
+    LastChunkLengthOfLastPiece = LastChunkLength rem ChunkLength,
+    NoOfChunksOfLastPiece = case LastChunkLengthOfLastPiece of
+                                0 -> LastPieceLength div ChunkLength;
+                                _ -> LastPieceLength div ChunkLength + 1
+                            end,
+
+    % list pieces
+    NormalPiece = #piece{piece_size = PieceLength, no_of_chunks = NoOfChunks, chunk_size = ChunkLength, last_chunk_size = LastChunkLength},
+    LastPiece = #piece{piece_size = LastPieceLength, no_of_chunks = NoOfChunksOfLastPiece, chunk_size = ChunkLength, last_chunk_size = LastChunkLengthOfLastPiece},
+
+    [NormalPiece || _ <- lists:seq(1, NoOfPieces - 1)] ++ [LastPiece].
+
+pieces_loop([]) -> io:format("Download Complete~n");
+pieces_loop(Pieces) ->
+    io:format("Looping~n"),
     receive
-        {add, Piece} -> loop([Piece | Pieces]);
-        {remove, Piece} -> loop(Pieces -- [Piece])
+        {add, Piece} -> pieces_loop([Piece | Pieces]);
+        {remove, Piece} -> pieces_loop(Pieces -- [Piece])
     end.
 
 tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
