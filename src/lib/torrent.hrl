@@ -8,6 +8,8 @@
 %%%-------------------------------------------------------------------
 -author("art").
 
--record(torrent, {files}).
--record(file, {no_of_pieces, piece_size, last_piece_size}).
--record(piece, {piece_size, no_of_chunks, chunk_size, last_chunk_size}).
+-record(torrent, {announce, files}).
+-record(file, {size, path, pieces}).
+-record(piece, {size, chunks}).
+-record(chunk, {size}).
+-record(peer, {id, ip, port}).
