@@ -58,10 +58,11 @@ get_pieces(Info) ->
     PieceLength = maps:get(<<"piece length">>, Info),
     FileLength = maps:get(<<"length">>, Info),
 
+    % function that generate list of chunks for each piece
     GenerateChunks = fun(PieceSize, ChunkSize) ->
         LastChunkSize = PieceSize rem ChunkSize,
         NoOfChunks = PieceLength div ChunkLength,
-        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 1)] ++
+        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 2)] ++
         case LastChunkSize of
             0 -> [];
             _ -> [#chunk{index = NoOfChunks, size = LastChunkSize}]
@@ -72,7 +73,11 @@ get_pieces(Info) ->
     LastPieceLength = FileLength rem PieceLength,
     NoOfPieces = FileLength div PieceLength,
 
-    [#piece{index = Index, size = PieceLength, chunks = GenerateChunks(PieceLength, ChunkLength)} || Index <- lists:seq(0, NoOfPieces - 1)] ++
+    % init normal piece
+    NormalPiece = #piece{size = PieceLength, chunks = GenerateChunks(PieceLength, ChunkLength)},
+
+    % return list of piece
+    [NormalPiece#piece{index = Index} || Index <- lists:seq(0, NoOfPieces - 2)] ++
     case LastPieceLength of
         0 -> [];
         _ -> [#piece{index = NoOfPieces, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkLength)}]
