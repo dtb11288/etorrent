@@ -21,16 +21,21 @@ download(Piece = #piece{index = _, chunks = Chunks, size = _PieceSize, status = 
 
 chunks_loop([], _Socket, Binary) ->
     {ok, Binary};
-chunks_loop([#chunk{index = Index, size = Size, status = _} | RestChunks], Socket, Binary) ->
+chunks_loop(Chunks = [#chunk{index = Index, size = Size, status = _} | RestChunks], Socket, Binary) ->
+    Offset = Index * Size,
     ok = gen_tcp:send(Socket, binary_to_list(utils:request(
         <<Index:32>>,
-        <<0:32>>,
+        <<Offset:32>>,
         <<Size:32>>)
     )),
     receive
-        {tcp, _, Downloaded} -> chunks_loop(RestChunks, Socket, <<Binary/binary, Downloaded/binary>>)
+        {tcp, _, Answer} ->
+            case utils:read(Answer) of
+                {data, Downloaded} -> chunks_loop(RestChunks, Socket, <<Downloaded/binary, Binary/binary>>);
+                _ -> chunks_loop(Chunks, Socket, Binary)
+            end
     after 30000 ->
-        io:format("Problem when download chunk"),
+        io:format("Problem when downloading chunk"),
         {error, cannot_download_chunk}
     end.
 

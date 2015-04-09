@@ -10,7 +10,7 @@
 -author("art").
 
 %% API
--export([message/1, integer_to_bits/1, request/3]).
+-export([message/1, integer_to_bits/1, request/3, read/1]).
 
 message(keep_alive) ->
     <<>>;
@@ -27,6 +27,11 @@ message(_) ->
 
 request(Index, Offset, Length)->
     <<6, Index/binary, Offset/binary, Length/binary>>.
+
+read(<<7, _Index:32, _Offset:32, Data/binary>>) ->
+    {data, Data};
+read(_) ->
+    whatever.
 
 integer_to_bits(Int) ->
     integer_to_bits(Int, 0, []).

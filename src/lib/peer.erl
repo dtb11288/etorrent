@@ -9,6 +9,7 @@
 -module(peer).
 -author("art").
 -define(M(Message), utils:message(Message)).
+-include("torrent.hrl").
 
 %% API
 -export([download/1]).
@@ -45,28 +46,25 @@ download({Ip, Port}) ->
         io:format("Timeout 2")
     end,
 
-%%     % send request to peer
-%%     ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<0:32>>,
-%%         <<0:32>>,
-%%         <<16384:32>>))),
-%%
-%%     receive
-%%         {tcp, _, WHATEVER} -> io:format("WHATEVER")
-%%     after 30000 ->
-%%         io:format("Timeout 3")
-%%     end,
-%%     % send request to peer
-%%     ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<1:32>>,
-%%         <<0:32>>,
-%%         <<16384:32>>))),
-%%
-%%     receive
-%%         {tcp, _, WHATEVER1} -> io:format("WHATEVER")
-%%     after 30000 ->
-%%         io:format("Timeout 3")
-%%     end,
-
+    download_loop(Sock),
+    gen_tcp:close(Sock),
     ok.
+
+download_loop(Sock) ->
+    Self = self(),
+    % popout a piece and download it
+    piece_list ! {pop, Self},
+    receive
+        {complete, #piece{}} -> download_completed;
+        {piece, Piece} ->
+            case piece:download(Piece#piece{peer = Sock})of
+                {ok, DonePiece} ->
+                    piece_list ! {done, Self, DonePiece},
+                    download_loop(Sock);
+                {error, ErrorPiece} ->
+                    piece_list ! {error, ErrorPiece}
+            end
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

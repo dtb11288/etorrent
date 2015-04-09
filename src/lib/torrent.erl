@@ -42,8 +42,7 @@ download(TorrentFile) ->
 
     % create pieces server
     Pieces = get_pieces(InfoMap),
-    io:format("~p~n", [Pieces]),
-%%     register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
+    register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
 
     % after get the peerlist, each peer in the list, connect
     % TODO: choose which peer to connect
@@ -83,12 +82,33 @@ get_pieces(Info) ->
         _ -> [#piece{index = NoOfPieces, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkLength)}]
     end.
 
-pieces_loop([]) -> io:format("Download Complete~n");
 pieces_loop(Pieces) ->
-    io:format("Looping~n"),
+    put(binary_stored, <<>>),
+    pieces_loop(Pieces, []).
+
+pieces_loop([], []) ->
+    file:write_file("/home/art/test.htm", get(binary_stored)),
+    io:format("Download completed ~n");
+pieces_loop(Pieces, Downloading) ->
     receive
-        {add, Piece} -> pieces_loop([Piece | Pieces]);
-        {remove, Piece} -> pieces_loop(Pieces -- [Piece])
+        {pop, FromPid} ->
+            case Pieces of
+                [] -> pieces_loop(Pieces, Downloading);
+                [H | T] -> FromPid ! {piece, H#piece{status = downloading}}, pieces_loop(T, [H#piece{status = downloading} | Downloading])
+            end;
+        {done, FromPid, DonePiece} ->
+            io:format("index ~p~n", [DonePiece#piece.index]),
+            % save data on disk or do something
+            Binary = get(binary_stored),
+            B = DonePiece#piece.data,
+            put(binary_stored, <<Binary/binary, B/binary>>),
+            UpdateDownloadList = Downloading -- [DonePiece#piece{status = downloading, peer = undefined, data = <<>>}],
+            case {Pieces, UpdateDownloadList} of
+                {[], []} -> FromPid ! {complete, #piece{}}, pieces_loop(Pieces, UpdateDownloadList);
+                _ -> pieces_loop(Pieces, UpdateDownloadList)
+            end;
+        {error, ErrorPiece} ->
+            pieces_loop([ErrorPiece#piece{status = undefined, peer = undefined} | Pieces], Downloading -- [ErrorPiece#piece{status = downloading, peer = undefined}])
     end.
 
 tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
