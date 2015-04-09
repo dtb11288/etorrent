@@ -40,21 +40,31 @@ download({Ip, Port}) ->
     ok = gen_tcp:send(Sock, ?M(interested)),
     receive
         {tcp, _, Answer} -> io:format("~w~n", [Answer])
-    after 1000 ->
+    after 10000 ->
         % if you dont receive choked message (or any message), just keep continue request
-        io:format("Timeout")
+        io:format("Timeout 2")
     end,
 
-    % send request to peer
-    ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<0:32>>,
-        <<0:32>>,
-        <<16384:32>>))),
-
-    receive
-        WHATEVER -> io:format("WHATEVER ~p~n", [WHATEVER])
-    after 30000 ->
-        io:format("Timeout")
-    end,
+%%     % send request to peer
+%%     ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<0:32>>,
+%%         <<0:32>>,
+%%         <<16384:32>>))),
+%%
+%%     receive
+%%         {tcp, _, WHATEVER} -> io:format("WHATEVER")
+%%     after 30000 ->
+%%         io:format("Timeout 3")
+%%     end,
+%%     % send request to peer
+%%     ok = gen_tcp:send(Sock, binary_to_list(utils:request(<<1:32>>,
+%%         <<0:32>>,
+%%         <<16384:32>>))),
+%%
+%%     receive
+%%         {tcp, _, WHATEVER1} -> io:format("WHATEVER")
+%%     after 30000 ->
+%%         io:format("Timeout 3")
+%%     end,
 
     ok.
 

@@ -14,7 +14,7 @@
 -include("torrent.hrl").
 
 download() ->
-    TorrentFile = "test.torrent",
+    TorrentFile = "test2.torrent",
     torrent:download(TorrentFile),
     done.
 
@@ -43,7 +43,7 @@ download(TorrentFile) ->
     % create pieces server
     Pieces = get_pieces(InfoMap),
     io:format("~p~n", [Pieces]),
-    register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
+%%     register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
 
     % after get the peerlist, each peer in the list, connect
     % TODO: choose which peer to connect
@@ -57,38 +57,26 @@ get_pieces(Info) ->
     ChunkLength = 1 bsl 14,
     PieceLength = maps:get(<<"piece length">>, Info),
     FileLength = maps:get(<<"length">>, Info),
-    put(piece_length, PieceLength),
-    io:format("PieceLength ~p~n", [PieceLength]),
-    io:format("FileLength ~p~n", [FileLength]),
+
+    GenerateChunks = fun(PieceSize, ChunkSize) ->
+        LastChunkSize = PieceSize rem ChunkSize,
+        NoOfChunks = PieceLength div ChunkLength,
+        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 1)] ++
+        case LastChunkSize of
+            0 -> [];
+            _ -> [#chunk{index = NoOfChunks, size = LastChunkSize}]
+        end
+    end,
 
     % calculate how many pieces
     LastPieceLength = FileLength rem PieceLength,
-    NoOfPieces = case LastPieceLength of
-                     0 -> FileLength div PieceLength;
-                     _ -> FileLength div PieceLength + 1
-                 end,
+    NoOfPieces = FileLength div PieceLength,
 
-
-    % calculate how many chunks in each piece
-    LastChunkLength = PieceLength rem ChunkLength,
-    NoOfChunks = case LastChunkLength of
-                     0 -> PieceLength div ChunkLength;
-                     _ -> PieceLength div ChunkLength + 1
-                 end,
-
-
-    % calculate how many chunks in last piece
-    LastChunkLengthOfLastPiece = LastChunkLength rem ChunkLength,
-    NoOfChunksOfLastPiece = case LastChunkLengthOfLastPiece of
-                                0 -> LastPieceLength div ChunkLength;
-                                _ -> LastPieceLength div ChunkLength + 1
-                            end,
-
-    % list pieces
-    NormalPiece = #piece{piece_size = PieceLength, no_of_chunks = NoOfChunks, chunk_size = ChunkLength, last_chunk_size = LastChunkLength},
-    LastPiece = #piece{piece_size = LastPieceLength, no_of_chunks = NoOfChunksOfLastPiece, chunk_size = ChunkLength, last_chunk_size = LastChunkLengthOfLastPiece},
-
-    [NormalPiece || _ <- lists:seq(1, NoOfPieces - 1)] ++ [LastPiece].
+    [#piece{index = Index, size = PieceLength, chunks = GenerateChunks(PieceLength, ChunkLength)} || Index <- lists:seq(0, NoOfPieces - 1)] ++
+    case LastPieceLength of
+        0 -> [];
+        _ -> [#piece{index = NoOfPieces, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkLength)}]
+    end.
 
 pieces_loop([]) -> io:format("Download Complete~n");
 pieces_loop(Pieces) ->
