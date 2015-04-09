@@ -61,8 +61,8 @@ get_pieces(Info) ->
     % function that generate list of chunks for each piece
     GenerateChunks = fun(PieceSize, ChunkSize) ->
         LastChunkSize = PieceSize rem ChunkSize,
-        NoOfChunks = PieceLength div ChunkLength,
-        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 2)] ++
+        NoOfChunks = PieceSize div ChunkSize,
+        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 1)] ++
         case LastChunkSize of
             0 -> [];
             _ -> [#chunk{index = NoOfChunks, size = LastChunkSize}]
@@ -77,7 +77,7 @@ get_pieces(Info) ->
     NormalPiece = #piece{size = PieceLength, chunks = GenerateChunks(PieceLength, ChunkLength)},
 
     % return list of piece
-    [NormalPiece#piece{index = Index} || Index <- lists:seq(0, NoOfPieces - 2)] ++
+    [NormalPiece#piece{index = Index} || Index <- lists:seq(0, NoOfPieces - 1)] ++
     case LastPieceLength of
         0 -> [];
         _ -> [#piece{index = NoOfPieces, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkLength)}]
