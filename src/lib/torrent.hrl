@@ -10,6 +10,6 @@
 
 -record(torrent, {announce, files, status}).
 -record(file, {size, path, pieces, status}).
--record(piece, {index, size, chunks, status, data = <<>>, peer}).
--record(chunk, {index, size, status}).
+-record(piece, {index, offset, size, chunks, status, data = <<>>, peer}).
+-record(chunk, {piece_index, offset, size, status}).
 -record(peer, {id, ip, port}).

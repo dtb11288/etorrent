@@ -13,7 +13,7 @@
 %% API
 -export([download/1]).
 
-download(Piece = #piece{index = _, chunks = Chunks, size = _PieceSize, status = _Status, peer = Socket}) ->
+download(Piece = #piece{index = _, offset = _, chunks = Chunks, size = _PieceSize, status = _Status, peer = Socket}) ->
     case chunks_loop(Chunks, Socket, <<>>) of
         {ok, Binary} -> {ok, Piece#piece{status = done, data = Binary}};
         _ -> {error, Piece}
@@ -21,8 +21,7 @@ download(Piece = #piece{index = _, chunks = Chunks, size = _PieceSize, status = 
 
 chunks_loop([], _Socket, Binary) ->
     {ok, Binary};
-chunks_loop(Chunks = [#chunk{index = Index, size = Size, status = _} | RestChunks], Socket, Binary) ->
-    Offset = Index * Size,
+chunks_loop(Chunks = [#chunk{piece_index = Index, offset = Offset, size = Size, status = _} | RestChunks], Socket, Binary) ->
     ok = gen_tcp:send(Socket, binary_to_list(utils:request(
         <<Index:32>>,
         <<Offset:32>>,
@@ -31,7 +30,7 @@ chunks_loop(Chunks = [#chunk{index = Index, size = Size, status = _} | RestChunk
     receive
         {tcp, _, Answer} ->
             case utils:read(Answer) of
-                {data, Downloaded} -> chunks_loop(RestChunks, Socket, <<Downloaded/binary, Binary/binary>>);
+                {data, Downloaded} -> chunks_loop(RestChunks, Socket, <<Binary/binary, Downloaded/binary>>);
                 _ -> chunks_loop(Chunks, Socket, Binary)
             end
     after 30000 ->

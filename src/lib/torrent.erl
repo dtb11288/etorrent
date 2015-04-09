@@ -42,6 +42,7 @@ download(TorrentFile) ->
 
     % create pieces server
     Pieces = get_pieces(InfoMap),
+    io:format("~p~n", [Pieces]),
     register(piece_list, spawn(fun() -> pieces_loop(Pieces) end)),
 
     % after get the peerlist, each peer in the list, connect
@@ -50,44 +51,46 @@ download(TorrentFile) ->
 %%     io:format("~p~n", [hd(PeerList)]),
     peer:download(hd(PeerList)),
 
+    inets:stop(),
+
     done.
 
 get_pieces(Info) ->
-    ChunkLength = 1 bsl 14,
-    PieceLength = maps:get(<<"piece length">>, Info),
+    ChunkSize0 = 1 bsl 14,
+    PieceSize0 = maps:get(<<"piece length">>, Info),
     FileLength = maps:get(<<"length">>, Info),
 
     % function that generate list of chunks for each piece
-    GenerateChunks = fun(PieceSize, ChunkSize) ->
+    GenerateChunks = fun(PieceSize, ChunkSize, PieceIndex) ->
         LastChunkSize = PieceSize rem ChunkSize,
         NoOfChunks = PieceSize div ChunkSize,
-        [#chunk{index = Index, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 1)] ++
+        [#chunk{piece_index = PieceIndex, offset = Index * ChunkSize, size = ChunkSize} || Index <- lists:seq(0, NoOfChunks - 1)] ++
         case LastChunkSize of
             0 -> [];
-            _ -> [#chunk{index = NoOfChunks, size = LastChunkSize}]
+            _ -> [#chunk{piece_index = PieceIndex, offset = NoOfChunks * ChunkSize, size = LastChunkSize}]
         end
     end,
 
     % calculate how many pieces
-    LastPieceLength = FileLength rem PieceLength,
-    NoOfPieces = FileLength div PieceLength,
-
-    % init normal piece
-    NormalPiece = #piece{size = PieceLength, chunks = GenerateChunks(PieceLength, ChunkLength)},
+    LastPieceLength = FileLength rem PieceSize0,
+    NoOfPieces = FileLength div PieceSize0,
 
     % return list of piece
-    [NormalPiece#piece{index = Index} || Index <- lists:seq(0, NoOfPieces - 1)] ++
+    [#piece{index = Index, size = PieceSize0, offset = Index * PieceSize0, chunks = GenerateChunks(PieceSize0, ChunkSize0, Index)} || Index <- lists:seq(0, NoOfPieces - 1)] ++
     case LastPieceLength of
         0 -> [];
-        _ -> [#piece{index = NoOfPieces, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkLength)}]
+        _ -> [#piece{index = NoOfPieces, offset = NoOfPieces * PieceSize0, size = LastPieceLength, chunks = GenerateChunks(LastPieceLength, ChunkSize0, NoOfPieces)}]
     end.
 
 pieces_loop(Pieces) ->
     put(binary_stored, <<>>),
+    put(index, []),
     pieces_loop(Pieces, []).
 
 pieces_loop([], []) ->
-    file:write_file("/home/art/test.htm", get(binary_stored)),
+    io:format("~p~n", [get(index)]),
+    file:write_file("/home/art/test.js", get(binary_stored)),
+    file:write_file("/home/art/test0.js", get({index, 0})),
     io:format("Download completed ~n");
 pieces_loop(Pieces, Downloading) ->
     receive
@@ -97,7 +100,8 @@ pieces_loop(Pieces, Downloading) ->
                 [H | T] -> FromPid ! {piece, H#piece{status = downloading}}, pieces_loop(T, [H#piece{status = downloading} | Downloading])
             end;
         {done, FromPid, DonePiece} ->
-            io:format("index ~p~n", [DonePiece#piece.index]),
+            put(index, get(index) ++ [DonePiece#piece.index]),
+            put({index, DonePiece#piece.index}, DonePiece#piece.data),
             % save data on disk or do something
             Binary = get(binary_stored),
             B = DonePiece#piece.data,
@@ -127,6 +131,12 @@ tracker_connect(AnnounceUrl, InfoHash, PeerID) ->
     {ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(Url),
 
     % TODO: if failed, retry, or get error message -> handle it
+    Event = "stopped",
+    CloseURL = lists:flatten(io_lib:format(
+        "~s?info_hash=~s&peer_id=~s&port=~p&uploaded=~p&downloaded=~p&left=~p&event=~s",
+        [AnnounceUrl,InfoHash, PeerID,
+            Port, Uploaded, Downloaded,Left, Event])),
+    {ok, _CloseReply} = httpc:request(CloseURL),
 
     % decode tracker response
     {ok, PeerInfos} = bencoding:decode(list_to_binary(Body)),

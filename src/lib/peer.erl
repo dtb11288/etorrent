@@ -15,6 +15,7 @@
 -export([download/1]).
 
 download({Ip, Port}) ->
+    io:format("~p~n", [{Ip, Port}]),
     % connect to the peer
     {ok, Sock} = gen_tcp:connect(Ip, Port,
         [binary, {packet, 0}, {active, false}]),
